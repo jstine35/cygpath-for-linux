@@ -1,0 +1,61 @@
+#!/bin/bash
+
+POSITIONAL=()
+while (( $# )); do
+    item=$1
+
+    # many cygpath options are intentionally ignored, such as -w
+    # and -m since this version should always output unix style paths.
+    case "$item" in
+        -a)  opt_abs=1 ;;
+        -f)  opt_filename=$2 ; shift ;;
+        --help) SHOWHELP=1 ;;
+        -*)  ;;
+        *)   
+        POSITIONAL+=( "$item" )
+        [[ $opt_filename ]] && {
+            CLI_ERROR_MSG="positional filenames are not allowed when using -f"
+        } >&2
+    ;;
+    esac
+    shift
+done
+
+[[ $CLI_ERROR_MSG ]] && {
+    echo "error: $CLI_ERROR_MSG"
+    exit 1
+} >&2
+
+(( SHOWHELP )) && {
+cat << BOOKENDS
+usage: cygpath [-a] [-f filename] [FILE]...
+
+Echos filenames as-is, or converted to absolute pathnames if -a option is given.
+Cygwin options such as -w and -m do nothing since there is no point to convert to
+windows style paths on unix. See 'winepath' if converting paths for use in wine.
+
+(todo: add more switches info here)
+BOOKENDS
+    exit 0
+}
+
+
+for item in "${POSITIONAL[@]}"; do
+    (( opt_abs )) && {
+        realpath -s -m "$item"
+        continue
+    }
+    echo "${item//\\//}"
+done
+
+# and also read file or stdin...
+[[ $opt_filename ]] && {
+    [[ "$opt_filename" == - ]] && opt_filename=/dev/stdin
+    while read -r item; do
+        (( opt_abs )) && {
+            realpath -s -m "$item"
+            continue
+        }
+        echo "${item//\\//}"
+    done < "$opt_filename"
+}
